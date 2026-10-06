@@ -1227,6 +1227,16 @@ pub trait Dialect: Debug + Any {
         false
     }
 
+    /// Returns true if `//` starts a single-line comment.
+    fn supports_double_slash_comments(&self) -> bool {
+        false
+    }
+
+    /// Returns true if `#` followed by `next` starts a single-line comment.
+    fn is_hash_comment_start(&self, _next: Option<char>) -> bool {
+        false
+    }
+
     /// Returns true if the dialect supports nested comments
     /// e.g. `/* /* nested */ */`
     fn supports_nested_comments(&self) -> bool {

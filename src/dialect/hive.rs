@@ -23,6 +23,10 @@ use crate::dialect::Dialect;
 pub struct HiveDialect {}
 
 impl Dialect for HiveDialect {
+    fn is_hash_comment_start(&self, _next: Option<char>) -> bool {
+        true
+    }
+
     fn is_delimited_identifier_start(&self, ch: char) -> bool {
         (ch == '"') || (ch == '`')
     }

@@ -40,16 +40,12 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "visitor")]
 use sqlparser_derive::{Visit, VisitMut};
 
+use crate::ast::{DollarQuotedString, QuoteDelimitedString};
 use crate::dialect::Dialect;
 use crate::dialect::{
     BigQueryDialect, DuckDbDialect, GenericDialect, MySqlDialect, PostgreSqlDialect,
-    SnowflakeDialect,
 };
 use crate::keywords::{Keyword, ALL_KEYWORDS, ALL_KEYWORDS_INDEX};
-use crate::{
-    ast::{DollarQuotedString, QuoteDelimitedString},
-    dialect::HiveDialect,
-};
 
 /// SQL Token enumeration
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
@@ -1501,8 +1497,8 @@ impl<'a> Tokenizer<'a> {
                             chars.next(); // consume the '*', starting a multi-line comment
                             self.tokenize_multiline_comment(chars)
                         }
-                        Some('/') if dialect_of!(self is SnowflakeDialect) => {
-                            chars.next(); // consume the second '/', starting a snowflake single-line comment
+                        Some('/') if self.dialect.supports_double_slash_comments() => {
+                            chars.next(); // consume the second '/'
                             let comment = self.tokenize_single_line_comment(chars);
                             Ok(Some(Token::Whitespace(Whitespace::SingleLineComment {
                                 prefix: "//".to_owned(),
@@ -1710,9 +1706,11 @@ impl<'a> Tokenizer<'a> {
                 }
                 '{' => self.consume_and_return(chars, Token::LBrace),
                 '}' => self.consume_and_return(chars, Token::RBrace),
-                '#' if dialect_of!(self is SnowflakeDialect | BigQueryDialect | MySqlDialect | HiveDialect) =>
+                '#' if self
+                    .dialect
+                    .is_hash_comment_start(chars.peekable.clone().nth(1)) =>
                 {
-                    chars.next(); // consume the '#', starting a snowflake single-line comment
+                    chars.next(); // consume the '#'
                     let comment = self.tokenize_single_line_comment(chars);
                     Ok(Some(Token::Whitespace(Whitespace::SingleLineComment {
                         prefix: "#".to_owned(),
@@ -2633,7 +2631,7 @@ mod tests {
     use super::*;
     use crate::dialect::{
         BigQueryDialect, ClickHouseDialect, HiveDialect, MsSqlDialect, MySqlDialect,
-        PostgreSqlDialect, SQLiteDialect,
+        PostgreSqlDialect, SQLiteDialect, SnowflakeDialect,
     };
     use crate::test_utils::{all_dialects, all_dialects_except, all_dialects_where};
     use core::fmt::Debug;

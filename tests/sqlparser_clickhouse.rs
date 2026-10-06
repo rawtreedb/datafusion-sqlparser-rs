@@ -1966,3 +1966,45 @@ fn clickhouse_and_generic() -> TestedDialects {
         Box::new(GenericDialect {}),
     ])
 }
+
+#[test]
+fn parse_clickhouse_line_comments() {
+    for prefix in ["//", "////", "# ", "#!"] {
+        for newline in ["\n", "\r\n"] {
+            clickhouse().one_statement_parses_to(
+                &format!("{prefix} unmatched quote ' ; DROP TABLE t{newline}SELECT 1"),
+                "SELECT 1",
+            );
+            clickhouse().one_statement_parses_to(
+                &format!("SELECT {prefix} ignored{newline}1 {prefix} trailing '"),
+                "SELECT 1",
+            );
+        }
+        clickhouse().one_statement_parses_to(
+            &format!("SELECT 1 {prefix} ignored\rDROP TABLE t"),
+            "SELECT 1",
+        );
+    }
+    clickhouse().verified_stmt("SELECT '//', '# ', '#!', 12 / 3 / 2");
+    clickhouse().verified_stmt("SELECT `//`, `# ` FROM `#!`");
+    clickhouse().one_statement_parses_to(
+        r#"/* outer /* # // */ still a comment */ SELECT 1"#,
+        "SELECT 1",
+    );
+}
+
+#[test]
+fn reject_clickhouse_hash_without_comment_prefix() {
+    for sql in [
+        "#comment\nSELECT 1",
+        "#\tcomment\nSELECT 1",
+        "#\nSELECT 1",
+        "#\u{a0}comment\nSELECT 1",
+        "#",
+    ] {
+        assert!(clickhouse().parse_sql_statements(sql).is_err(), "{sql}");
+    }
+    assert!(clickhouse()
+        .parse_sql_statements("SELECT 'unterminated //")
+        .is_err());
+}

@@ -135,6 +135,14 @@ const RESERVED_KEYWORDS_FOR_TABLE_FACTOR: &[Keyword] = &[
 pub struct SnowflakeDialect;
 
 impl Dialect for SnowflakeDialect {
+    fn supports_double_slash_comments(&self) -> bool {
+        true
+    }
+
+    fn is_hash_comment_start(&self, _next: Option<char>) -> bool {
+        true
+    }
+
     // see https://docs.snowflake.com/en/sql-reference/identifiers-syntax.html
     fn is_identifier_start(&self, ch: char) -> bool {
         ch.is_ascii_lowercase() || ch.is_ascii_uppercase() || ch == '_'
