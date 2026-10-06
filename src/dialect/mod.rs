@@ -1227,6 +1227,16 @@ pub trait Dialect: Debug + Any {
         false
     }
 
+    /// Supports expression-first scalar bindings in WITH clauses.
+    fn supports_with_scalar_bindings(&self) -> bool {
+        false
+    }
+
+    /// Supports wildcard column selectors in INSERT target lists.
+    fn supports_insert_column_wildcard(&self) -> bool {
+        false
+    }
+
     /// Returns true if `//` starts a single-line comment.
     fn supports_double_slash_comments(&self) -> bool {
         false

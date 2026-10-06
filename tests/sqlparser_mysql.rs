@@ -1933,8 +1933,8 @@ fn parse_simple_insert() {
             );
             assert_eq!(
                 vec![
-                    ObjectName::from(Ident::new("title")),
-                    ObjectName::from(Ident::new("priority"))
+                    InsertColumn::Column(ObjectName::from(Ident::new("title"))),
+                    InsertColumn::Column(ObjectName::from(Ident::new("priority")))
                 ],
                 columns
             );
@@ -2004,8 +2004,8 @@ fn parse_ignore_insert() {
             );
             assert_eq!(
                 vec![
-                    ObjectName::from(Ident::new("title")),
-                    ObjectName::from(Ident::new("priority"))
+                    InsertColumn::Column(ObjectName::from(Ident::new("title"))),
+                    InsertColumn::Column(ObjectName::from(Ident::new("priority")))
                 ],
                 columns
             );
@@ -2060,8 +2060,8 @@ fn parse_priority_insert() {
             );
             assert_eq!(
                 vec![
-                    ObjectName::from(Ident::new("title")),
-                    ObjectName::from(Ident::new("priority"))
+                    InsertColumn::Column(ObjectName::from(Ident::new("title"))),
+                    InsertColumn::Column(ObjectName::from(Ident::new("priority")))
                 ],
                 columns
             );
@@ -2113,8 +2113,8 @@ fn parse_priority_insert() {
             );
             assert_eq!(
                 vec![
-                    ObjectName::from(Ident::new("title")),
-                    ObjectName::from(Ident::new("priority"))
+                    InsertColumn::Column(ObjectName::from(Ident::new("title"))),
+                    InsertColumn::Column(ObjectName::from(Ident::new("priority")))
                 ],
                 columns
             );
@@ -2166,7 +2166,9 @@ fn parse_insert_as() {
                 table_name
             );
             assert_eq!(
-                vec![ObjectName::from(Ident::with_quote('`', "date"))],
+                vec![InsertColumn::Column(ObjectName::from(Ident::with_quote(
+                    '`', "date"
+                )))],
                 columns
             );
             let insert_alias = insert_alias.unwrap();
@@ -2222,8 +2224,8 @@ fn parse_insert_as() {
             );
             assert_eq!(
                 vec![
-                    ObjectName::from(Ident::with_quote('`', "id")),
-                    ObjectName::from(Ident::with_quote('`', "date"))
+                    InsertColumn::Column(ObjectName::from(Ident::with_quote('`', "id"))),
+                    InsertColumn::Column(ObjectName::from(Ident::with_quote('`', "date")))
                 ],
                 columns
             );
@@ -2288,8 +2290,8 @@ fn parse_replace_insert() {
             );
             assert_eq!(
                 vec![
-                    ObjectName::from(Ident::new("title")),
-                    ObjectName::from(Ident::new("priority"))
+                    InsertColumn::Column(ObjectName::from(Ident::new("title"))),
+                    InsertColumn::Column(ObjectName::from(Ident::new("priority")))
                 ],
                 columns
             );
@@ -2389,12 +2391,12 @@ fn parse_insert_with_on_duplicate_update() {
             );
             assert_eq!(
                 vec![
-                    ObjectName::from(Ident::new("name")),
-                    ObjectName::from(Ident::new("description")),
-                    ObjectName::from(Ident::new("perm_create")),
-                    ObjectName::from(Ident::new("perm_read")),
-                    ObjectName::from(Ident::new("perm_update")),
-                    ObjectName::from(Ident::new("perm_delete"))
+                    InsertColumn::Column(ObjectName::from(Ident::new("name"))),
+                    InsertColumn::Column(ObjectName::from(Ident::new("description"))),
+                    InsertColumn::Column(ObjectName::from(Ident::new("perm_create"))),
+                    InsertColumn::Column(ObjectName::from(Ident::new("perm_read"))),
+                    InsertColumn::Column(ObjectName::from(Ident::new("perm_update"))),
+                    InsertColumn::Column(ObjectName::from(Ident::new("perm_delete")))
                 ],
                 columns
             );
@@ -2709,7 +2711,9 @@ fn parse_insert_with_numeric_prefix_column_name() {
                 table_name
             );
             assert_eq!(
-                vec![ObjectName::from(Ident::new("123col_$@length123"))],
+                vec![InsertColumn::Column(ObjectName::from(Ident::new(
+                    "123col_$@length123"
+                )))],
                 columns
             );
         }

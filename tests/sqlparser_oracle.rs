@@ -22,8 +22,8 @@ use pretty_assertions::assert_eq;
 
 use sqlparser::{
     ast::{
-        BinaryOperator, Expr, Ident, Insert, ObjectName, Query, QuoteDelimitedString, SetExpr,
-        Statement, TableAliasWithoutColumns, TableObject, Value, ValueWithSpan,
+        BinaryOperator, Expr, Ident, Insert, InsertColumn, ObjectName, Query, QuoteDelimitedString,
+        SetExpr, Statement, TableAliasWithoutColumns, TableObject, Value, ValueWithSpan,
     },
     dialect::OracleDialect,
     parser::ParserError,
@@ -479,8 +479,8 @@ fn test_insert_with_table_alias() {
     if let Statement::Insert(Insert { columns, .. }) = stmt {
         assert_eq!(
             vec![
-                ObjectName::from(vec![Ident::new("t"), Ident::new("id")]),
-                ObjectName::from(vec![Ident::new("t"), Ident::new("val")])
+                InsertColumn::Column(ObjectName::from(vec![Ident::new("t"), Ident::new("id")])),
+                InsertColumn::Column(ObjectName::from(vec![Ident::new("t"), Ident::new("val")]))
             ],
             columns
         );

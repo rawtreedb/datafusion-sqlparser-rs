@@ -15060,6 +15060,30 @@ impl<'a> Parser<'a> {
 
     /// Parse a CTE (`alias [( col1, col2, ... )] [AS] (subquery)`)
     pub fn parse_cte(&mut self) -> Result<Cte, ParserError> {
+        if self.dialect.supports_with_scalar_bindings() {
+            if let Some(cte) = self.maybe_parse(|p| p.parse_query_cte())? {
+                return Ok(cte);
+            }
+            let expr = self.parse_expr()?;
+            self.expect_keyword_is(Keyword::AS)?;
+            let name = self.parse_identifier()?;
+            return Ok(Cte {
+                alias: TableAlias {
+                    explicit: false,
+                    name,
+                    columns: vec![],
+                    at: None,
+                },
+                body: CteBody::Expression(Box::new(expr)),
+                from: None,
+                materialized: None,
+                closing_paren_token: AttachedToken::empty(),
+            });
+        }
+        self.parse_query_cte()
+    }
+
+    fn parse_query_cte(&mut self) -> Result<Cte, ParserError> {
         let name = self.parse_identifier()?;
 
         let as_optional = self.dialect.supports_cte_without_as();
@@ -15079,7 +15103,7 @@ impl<'a> Parser<'a> {
                         columns: vec![],
                         at: None,
                     },
-                    query,
+                    body: CteBody::Query(query),
                     from: None,
                     materialized: None,
                     closing_paren_token: closing_paren_token.into(),
@@ -15124,7 +15148,7 @@ impl<'a> Parser<'a> {
                 columns,
                 at: None,
             },
-            query,
+            body: CteBody::Query(query),
             from: None,
             materialized: is_materialized,
             closing_paren_token: closing_paren_token.into(),
@@ -18533,7 +18557,18 @@ impl<'a> Parser<'a> {
             } else {
                 let (columns, partitioned, after_columns) = if !self.peek_subquery_start() {
                     let columns =
-                        self.parse_parenthesized_qualified_column_list(Optional, is_mysql)?;
+                        self.parse_parenthesized_column_list_inner(Optional, is_mysql, |p| {
+                            if p.dialect.supports_insert_column_wildcard()
+                                && p.peek_token_ref().token == Token::Mul
+                            {
+                                let token = p.next_token();
+                                Ok(InsertColumn::Wildcard(
+                                    p.parse_wildcard_additional_options(token)?,
+                                ))
+                            } else {
+                                p.parse_object_name(true).map(InsertColumn::Column)
+                            }
+                        })?;
 
                     let partitioned = self.parse_insert_partition()?;
                     by_name = self.parse_keywords(&[Keyword::BY, Keyword::NAME]);

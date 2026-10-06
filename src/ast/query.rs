@@ -793,6 +793,17 @@ impl fmt::Display for CteAsMaterialized {
     }
 }
 
+/// The body of a WITH binding.
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
+pub enum CteBody {
+    /// A named subquery: `alias AS (query)`.
+    Query(Box<Query>),
+    /// A ClickHouse scalar binding: `expression AS alias`.
+    Expression(Box<Expr>),
+}
+
 /// A single CTE (used after `WITH`): `<alias> [(col1, col2, ...)] AS <materialized> ( <query> )`
 /// The names in the column list before `AS`, when specified, replace the names
 /// of the columns returned by the query. The parser does not validate that the
@@ -803,8 +814,8 @@ impl fmt::Display for CteAsMaterialized {
 pub struct Cte {
     /// The CTE alias (name introduced before the `AS` keyword).
     pub alias: TableAlias,
-    /// The query that defines the CTE body.
-    pub query: Box<Query>,
+    /// The query or scalar expression that defines the binding.
+    pub body: CteBody,
     /// Optional `FROM` identifier for materialized CTEs.
     pub from: Option<Ident>,
     /// Optional `AS MATERIALIZED` / `AS NOT MATERIALIZED` hint.
@@ -815,12 +826,16 @@ pub struct Cte {
 
 impl fmt::Display for Cte {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let query = match &self.body {
+            CteBody::Expression(expr) => return write!(f, "{expr} AS {}", self.alias.name),
+            CteBody::Query(query) => query,
+        };
         match self.materialized.as_ref() {
             None => {
                 self.alias.fmt(f)?;
                 f.write_str(" AS (")?;
                 NewLine.fmt(f)?;
-                Indent(&self.query).fmt(f)?;
+                Indent(query).fmt(f)?;
                 NewLine.fmt(f)?;
                 f.write_str(")")?;
             }
@@ -830,7 +845,7 @@ impl fmt::Display for Cte {
                 materialized.fmt(f)?;
                 f.write_str(" (")?;
                 NewLine.fmt(f)?;
-                Indent(&self.query).fmt(f)?;
+                Indent(query).fmt(f)?;
                 NewLine.fmt(f)?;
                 f.write_str(")")?;
             }

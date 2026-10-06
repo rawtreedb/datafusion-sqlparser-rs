@@ -33,12 +33,12 @@ use super::{
     AttachedToken, BeginEndStatements, CaseStatement, CloseCursor, ClusteredIndex, ColumnDef,
     ColumnOption, ColumnOptionDef, ConditionalStatementBlock, ConditionalStatements,
     ConflictTarget, ConnectByKind, ConstraintCharacteristics, CopySource, CreateIndex, CreateTable,
-    CreateTableOptions, Cte, Delete, DoUpdate, ExceptSelectItem, ExcludeConstraintElement,
+    CreateTableOptions, Cte, CteBody, Delete, DoUpdate, ExceptSelectItem, ExcludeConstraintElement,
     ExcludeSelectItem, Expr, ExprWithAlias, Fetch, ForValues, FromTable, Function, FunctionArg,
     FunctionArgExpr, FunctionArgumentClause, FunctionArgumentList, FunctionArguments, GroupByExpr,
-    HavingBound, IfStatement, IlikeSelectItem, IndexColumn, Insert, Interpolate, InterpolateExpr,
-    Join, JoinConstraint, JoinOperator, JsonPath, JsonPathElem, LateralView, LimitClause,
-    MatchRecognizePattern, Measure, Merge, MergeAction, MergeClause, MergeInsertExpr,
+    HavingBound, IfStatement, IlikeSelectItem, IndexColumn, Insert, InsertColumn, Interpolate,
+    InterpolateExpr, Join, JoinConstraint, JoinOperator, JsonPath, JsonPathElem, LateralView,
+    LimitClause, MatchRecognizePattern, Measure, Merge, MergeAction, MergeClause, MergeInsertExpr,
     MergeInsertKind, MergeUpdateExpr, MergeUpdateKind, NamedParenthesizedList,
     NamedWindowDefinition, ObjectName, ObjectNamePart, Offset, OnConflict, OnConflictAction,
     OnInsert, OpenStatement, OrderBy, OrderByExpr, OrderByKind, OutputClause, Parens, Partition,
@@ -194,11 +194,29 @@ impl Spanned for With {
     }
 }
 
+impl Spanned for InsertColumn {
+    fn span(&self) -> Span {
+        match self {
+            Self::Column(name) => name.span(),
+            Self::Wildcard(options) => options.span(),
+        }
+    }
+}
+
+impl Spanned for CteBody {
+    fn span(&self) -> Span {
+        match self {
+            Self::Query(query) => query.span(),
+            Self::Expression(expr) => expr.span(),
+        }
+    }
+}
+
 impl Spanned for Cte {
     fn span(&self) -> Span {
         let Cte {
             alias,
-            query,
+            body,
             from,
             materialized: _, // enum
             closing_paren_token,
@@ -206,7 +224,7 @@ impl Spanned for Cte {
 
         union_spans(
             core::iter::once(alias.span())
-                .chain(core::iter::once(query.span()))
+                .chain(core::iter::once(body.span()))
                 .chain(from.iter().map(|item| item.span))
                 .chain(core::iter::once(closing_paren_token.0.span)),
         )
@@ -2756,7 +2774,7 @@ pub mod tests {
 
         let query = test.0.parse_query().unwrap();
         let cte_span = query.clone().with.unwrap().cte_tables[0].span();
-        let cte_query_span = query.clone().with.unwrap().cte_tables[0].query.span();
+        let cte_query_span = query.clone().with.unwrap().cte_tables[0].body.span();
         let body_span = query.body.span();
 
         // the WITH keyboard is part of the query

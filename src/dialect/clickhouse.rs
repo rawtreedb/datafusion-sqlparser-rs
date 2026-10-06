@@ -23,6 +23,14 @@ use crate::dialect::Dialect;
 pub struct ClickHouseDialect {}
 
 impl Dialect for ClickHouseDialect {
+    fn supports_with_scalar_bindings(&self) -> bool {
+        true
+    }
+
+    fn supports_insert_column_wildcard(&self) -> bool {
+        true
+    }
+
     fn supports_double_slash_comments(&self) -> bool {
         true
     }

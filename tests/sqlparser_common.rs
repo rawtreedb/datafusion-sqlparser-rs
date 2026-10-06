@@ -173,7 +173,7 @@ fn parse_insert_values() {
                 for (index, column) in columns.iter().enumerate() {
                     assert_eq!(
                         column,
-                        &ObjectName::from(Ident::new(expected_columns[index].clone()))
+                        &InsertColumn::from(Ident::new(expected_columns[index].clone()))
                     );
                 }
                 match *source.body {
@@ -8143,7 +8143,14 @@ fn parse_ctes() {
 
     fn assert_ctes_in_select(expected: &[&str], sel: &Query) {
         for (i, exp) in expected.iter().enumerate() {
-            let Cte { alias, query, .. } = &sel.with.as_ref().unwrap().cte_tables[i];
+            let Cte {
+                alias,
+                body: CteBody::Query(query),
+                ..
+            } = &sel.with.as_ref().unwrap().cte_tables[i]
+            else {
+                panic!("Expected query CTE")
+            };
             assert_eq!(*exp, query.to_string());
             assert_eq!(false, alias.explicit);
             assert_eq!(
@@ -8187,7 +8194,11 @@ fn parse_ctes() {
     // CTE in a CTE...
     let sql = &format!("WITH outer_cte AS ({with}) SELECT * FROM outer_cte");
     let select = verified_query(sql);
-    assert_ctes_in_select(&cte_sqls, &only(&select.with.unwrap().cte_tables).query);
+    let with = select.with.unwrap();
+    let CteBody::Query(query) = &only(&with.cte_tables).body else {
+        panic!("Expected query CTE")
+    };
+    assert_ctes_in_select(&cte_sqls, query);
 }
 
 #[test]
@@ -8232,7 +8243,7 @@ fn parse_recursive_cte() {
             columns: vec![TableAliasColumnDef::from_name("val")],
             at: None,
         },
-        query: Box::new(cte_query),
+        body: CteBody::Query(Box::new(cte_query)),
         from: None,
         materialized: None,
         closing_paren_token: AttachedToken::empty(),

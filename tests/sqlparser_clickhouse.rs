@@ -30,8 +30,9 @@ use sqlparser::ast::SelectItem::UnnamedExpr;
 use sqlparser::ast::TableFactor::Table;
 use sqlparser::ast::Value::Boolean;
 use sqlparser::ast::*;
-use sqlparser::dialect::ClickHouseDialect;
 use sqlparser::dialect::GenericDialect;
+use sqlparser::dialect::{ClickHouseDialect, PostgreSqlDialect};
+use sqlparser::parser::Parser;
 use sqlparser::parser::ParserError::ParserError;
 
 #[test]
@@ -2007,4 +2008,53 @@ fn reject_clickhouse_hash_without_comment_prefix() {
     assert!(clickhouse()
         .parse_sql_statements("SELECT 'unterminated //")
         .is_err());
+}
+
+#[test]
+fn clickhouse_with_scalar_bindings() {
+    for sql in [
+        "WITH 1 AS n SELECT n",
+        "WITH lower('X') AS name, t AS (SELECT id FROM events) SELECT name FROM t",
+        "WITH t AS (SELECT id FROM events), 1 AS n SELECT n FROM t",
+        "WITH (SELECT count(*) FROM events) AS n SELECT n",
+        "WITH (x -> x + 1) AS increment SELECT increment(1)",
+        "INSERT INTO daily WITH 1 AS n SELECT n",
+        "SELECT * FROM (WITH 1 AS n SELECT n)",
+    ] {
+        clickhouse().verified_stmt(sql);
+    }
+    for sql in [
+        "WITH 1 SELECT 1",
+        "WITH 1 AS SELECT",
+        "WITH t AS () SELECT 1",
+        "WITH 1 AS n, SELECT n",
+    ] {
+        assert!(
+            Parser::parse_sql(&ClickHouseDialect {}, sql).is_err(),
+            "{sql}"
+        );
+    }
+    assert!(Parser::parse_sql(&PostgreSqlDialect {}, "WITH 1 AS n SELECT n").is_err());
+}
+
+#[test]
+fn clickhouse_insert_wildcard_columns() {
+    for sql in [
+        "INSERT INTO daily (*) SELECT * FROM events",
+        "INSERT INTO daily (* EXCEPT (id, ts)) SELECT * EXCEPT (id, ts) FROM events",
+        "INSERT INTO daily (id, * EXCEPT (id)) SELECT * FROM events",
+        "INSERT INTO daily (nested.value) SELECT value FROM events",
+    ] {
+        clickhouse().verified_stmt(sql);
+    }
+    for sql in [
+        "INSERT INTO daily (* EXCEPT ()) SELECT 1",
+        "INSERT INTO daily (* SELECT 1",
+    ] {
+        assert!(
+            Parser::parse_sql(&ClickHouseDialect {}, sql).is_err(),
+            "{sql}"
+        );
+    }
+    assert!(Parser::parse_sql(&PostgreSqlDialect {}, "INSERT INTO daily (*) SELECT 1").is_err());
 }

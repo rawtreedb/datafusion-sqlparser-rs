@@ -37,6 +37,38 @@ use super::{
     Values,
 };
 
+/// A named column or wildcard selector in an INSERT target list.
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
+pub enum InsertColumn {
+    /// A column name.
+    Column(ObjectName),
+    /// A wildcard with optional column transformations.
+    Wildcard(crate::ast::WildcardAdditionalOptions),
+}
+
+impl Display for InsertColumn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Column(name) => name.fmt(f),
+            Self::Wildcard(options) => write!(f, "*{options}"),
+        }
+    }
+}
+
+impl From<ObjectName> for InsertColumn {
+    fn from(name: ObjectName) -> Self {
+        Self::Column(name)
+    }
+}
+
+impl From<Ident> for InsertColumn {
+    fn from(name: Ident) -> Self {
+        Self::Column(ObjectName::from(vec![name]))
+    }
+}
+
 /// INSERT statement.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -61,7 +93,7 @@ pub struct Insert {
     /// `table_name foo` (for Oracle)
     pub table_alias: Option<TableAliasWithoutColumns>,
     /// COLUMNS
-    pub columns: Vec<ObjectName>,
+    pub columns: Vec<InsertColumn>,
     /// `BY NAME` clause used by Databricks SQL.
     ///
     /// When present, columns from the source query are matched to columns in

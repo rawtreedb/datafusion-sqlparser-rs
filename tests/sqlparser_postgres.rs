@@ -6123,16 +6123,16 @@ fn test_simple_postgres_insert_with_alias() {
                 }
             }),
             columns: vec![
-                ObjectName::from(Ident {
+                InsertColumn::Column(ObjectName::from(Ident {
                     value: "id".to_string(),
                     quote_style: None,
                     span: Span::empty(),
-                }),
-                ObjectName::from(Ident {
+                })),
+                InsertColumn::Column(ObjectName::from(Ident {
                     value: "a".to_string(),
                     quote_style: None,
                     span: Span::empty(),
-                })
+                }))
             ],
             by_name: false,
             overwrite: false,
@@ -6204,16 +6204,16 @@ fn test_simple_postgres_insert_with_alias() {
                 }
             }),
             columns: vec![
-                ObjectName::from(Ident {
+                InsertColumn::Column(ObjectName::from(Ident {
                     value: "id".to_string(),
                     quote_style: None,
                     span: Span::empty(),
-                }),
-                ObjectName::from(Ident {
+                })),
+                InsertColumn::Column(ObjectName::from(Ident {
                     value: "a".to_string(),
                     quote_style: None,
                     span: Span::empty(),
-                })
+                }))
             ],
             by_name: false,
             overwrite: false,
@@ -6287,16 +6287,16 @@ fn test_simple_insert_with_quoted_alias() {
                 }
             }),
             columns: vec![
-                ObjectName::from(Ident {
+                InsertColumn::Column(ObjectName::from(Ident {
                     value: "id".to_string(),
                     quote_style: None,
                     span: Span::empty(),
-                }),
-                ObjectName::from(Ident {
+                })),
+                InsertColumn::Column(ObjectName::from(Ident {
                     value: "a".to_string(),
                     quote_style: None,
                     span: Span::empty(),
-                })
+                }))
             ],
             by_name: false,
             overwrite: false,
