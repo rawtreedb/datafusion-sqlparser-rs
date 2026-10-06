@@ -2058,3 +2058,44 @@ fn clickhouse_insert_wildcard_columns() {
     }
     assert!(Parser::parse_sql(&PostgreSqlDialect {}, "INSERT INTO daily (*) SELECT 1").is_err());
 }
+
+#[test]
+fn clickhouse_json_subcolumns() {
+    for sql in [
+        "SELECT json.a.:Int64 FROM events",
+        "SELECT json.a.:`Array(Nullable(Int64))` FROM events",
+        "SELECT json.^a.b, json.@a.b FROM events",
+        "SELECT json.a[].b, json.a[][].b FROM events",
+        "SELECT json.a.:`Array(JSON)`.b FROM events",
+        "INSERT INTO daily SELECT json.a.:Int64 FROM events WHERE json.b.:String = 'x'",
+    ] {
+        clickhouse().verified_stmt(sql);
+    }
+    for sql in [
+        "SELECT json.a.:",
+        "SELECT json.^",
+        "SELECT json.@",
+        "SELECT json.a[]..b",
+        "SELECT json[]",
+        "SELECT (json.a)[]",
+        "SELECT json.a.:Int64[]",
+        "SELECT f().:Int64",
+        "SELECT json.a[1].:Int64",
+    ] {
+        assert!(
+            Parser::parse_sql(&ClickHouseDialect {}, sql).is_err(),
+            "{sql}"
+        );
+    }
+    for sql in [
+        "SELECT json.a.:Int64",
+        "SELECT json.^a",
+        "SELECT json.@a",
+        "SELECT json.a[].b",
+    ] {
+        assert!(
+            Parser::parse_sql(&PostgreSqlDialect {}, sql).is_err(),
+            "{sql}"
+        );
+    }
+}

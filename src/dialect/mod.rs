@@ -1237,6 +1237,11 @@ pub trait Dialect: Debug + Any {
         false
     }
 
+    /// Supports ClickHouse JSON subcolumns: `.:Type`, `.^path`, `.@path`, and `[]`.
+    fn supports_json_subcolumns(&self) -> bool {
+        false
+    }
+
     /// Returns true if `//` starts a single-line comment.
     fn supports_double_slash_comments(&self) -> bool {
         false

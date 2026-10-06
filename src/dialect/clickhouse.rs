@@ -31,6 +31,10 @@ impl Dialect for ClickHouseDialect {
         true
     }
 
+    fn supports_json_subcolumns(&self) -> bool {
+        true
+    }
+
     fn supports_double_slash_comments(&self) -> bool {
         true
     }

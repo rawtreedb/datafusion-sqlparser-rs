@@ -1360,6 +1360,11 @@ impl<'a> Parser<'a> {
                                 AttachedToken(next_token),
                             ));
                         }
+                        Token::Colon | Token::Caret | Token::AtSign
+                            if self.dialect.supports_json_subcolumns() =>
+                        {
+                            break;
+                        }
                         _ => {
                             return self.expected("an identifier or a '*' after '.'", next_token);
                         }
@@ -2073,7 +2078,10 @@ impl<'a> Parser<'a> {
         mut chain: Vec<AccessExpr>,
     ) -> Result<Expr, ParserError> {
         let mut ending_wildcard: Option<TokenWithSpan> = None;
+        let mut is_json_path =
+            self.dialect.supports_json_subcolumns() && Self::is_json_subcolumn_path(&root, &chain);
         loop {
+            let chain_start = chain.len();
             if self.consume_token(&Token::Period) {
                 let next_token = self.peek_token_ref();
                 match &next_token.token {
@@ -2092,6 +2100,23 @@ impl<'a> Parser<'a> {
                         }
 
                         break;
+                    }
+                    Token::Colon | Token::Caret | Token::AtSign
+                        if self.dialect.supports_json_subcolumns() =>
+                    {
+                        if !is_json_path {
+                            return self.expected_ref(
+                                "an identifier path before JSON subcolumn access",
+                                next_token,
+                            );
+                        }
+                        let delimiter = self.next_token().token;
+                        let ident = self.parse_identifier()?;
+                        chain.push(match delimiter {
+                            Token::Colon => AccessExpr::TypedSubcolumn(ident),
+                            Token::Caret => AccessExpr::JsonSubobject(ident),
+                            _ => AccessExpr::JsonCombined(ident),
+                        });
                     }
                     Token::SingleQuotedString(s) => {
                         let expr =
@@ -2177,10 +2202,25 @@ impl<'a> Parser<'a> {
             } else if !self.dialect.supports_partiql()
                 && self.peek_token_ref().token == Token::LBracket
             {
-                self.parse_multi_dim_subscript(&mut chain)?;
+                if is_json_path
+                    && matches!(
+                        chain.last(),
+                        Some(AccessExpr::Dot(_) | AccessExpr::JsonArray)
+                    )
+                    && self.peek_nth_token_ref(1).token == Token::RBracket
+                {
+                    self.advance_token();
+                    self.advance_token();
+                    chain.push(AccessExpr::JsonArray);
+                } else {
+                    self.parse_multi_dim_subscript(&mut chain)?;
+                }
             } else {
                 break;
             }
+            // Inspect only newly appended components so long paths remain linear.
+            is_json_path =
+                is_json_path && Self::is_json_subcolumn_path(&root, &chain[chain_start..]);
         }
 
         let tok_index = self.get_current_index();
@@ -2206,6 +2246,20 @@ impl<'a> Parser<'a> {
         } else {
             Self::build_compound_expr(root, chain)
         }
+    }
+
+    fn is_json_subcolumn_path(root: &Expr, chain: &[AccessExpr]) -> bool {
+        matches!(root, Expr::Identifier(_))
+            && chain.iter().all(|access| {
+                matches!(
+                    access,
+                    AccessExpr::Dot(Expr::Identifier(_))
+                        | AccessExpr::TypedSubcolumn(_)
+                        | AccessExpr::JsonSubobject(_)
+                        | AccessExpr::JsonCombined(_)
+                        | AccessExpr::JsonArray
+                )
+            })
     }
 
     /// Combines a root expression and access chain to form

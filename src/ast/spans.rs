@@ -1740,6 +1740,10 @@ impl Spanned for AccessExpr {
         match self {
             AccessExpr::Dot(ident) => ident.span(),
             AccessExpr::Subscript(subscript) => subscript.span(),
+            AccessExpr::TypedSubcolumn(ident)
+            | AccessExpr::JsonSubobject(ident)
+            | AccessExpr::JsonCombined(ident) => ident.span,
+            AccessExpr::JsonArray => Span::empty(),
         }
     }
 }

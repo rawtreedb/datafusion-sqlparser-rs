@@ -1489,6 +1489,14 @@ pub enum AccessExpr {
     Dot(Expr),
     /// Accesses a field or array element using bracket notation, e.g. `foo['bar']`.
     Subscript(Subscript),
+    /// ClickHouse dynamic-type subcolumn, e.g. `json.a.:Int64`.
+    TypedSubcolumn(Ident),
+    /// ClickHouse JSON sub-object, e.g. `json.^a`.
+    JsonSubobject(Ident),
+    /// ClickHouse combined JSON subcolumn, e.g. `json.@a`.
+    JsonCombined(Ident),
+    /// ClickHouse array-of-JSON subcolumn shorthand, e.g. `json.a[].b`.
+    JsonArray,
 }
 
 impl fmt::Display for AccessExpr {
@@ -1499,6 +1507,10 @@ impl fmt::Display for AccessExpr {
             }
             AccessExpr::Dot(expr) => write!(f, ".{expr}"),
             AccessExpr::Subscript(subscript) => write!(f, "[{subscript}]"),
+            AccessExpr::TypedSubcolumn(ident) => write!(f, ".:{ident}"),
+            AccessExpr::JsonSubobject(ident) => write!(f, ".^{ident}"),
+            AccessExpr::JsonCombined(ident) => write!(f, ".@{ident}"),
+            AccessExpr::JsonArray => write!(f, "[]"),
         }
     }
 }
