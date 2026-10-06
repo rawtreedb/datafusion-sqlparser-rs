@@ -894,6 +894,13 @@ pub enum SelectItem {
         /// The list of aliases for the expression.
         aliases: Vec<Ident>,
     },
+    /// A ClickHouse COLUMNS expression with ordered column transformers.
+    ExprWithColumnTransformers {
+        /// The column-matching expression.
+        expr: Expr,
+        /// Transformations in source order.
+        transformers: Vec<ColumnTransformer>,
+    },
     /// An expression, followed by a wildcard expansion.
     /// e.g. `alias.*`, `STRUCT<STRING>('foo').*`
     QualifiedWildcard(SelectItemQualifiedWildcardKind, WildcardAdditionalOptions),
@@ -959,6 +966,8 @@ pub struct WildcardAdditionalOptions {
     /// `[AS <alias>]`.
     ///  Redshift syntax: <https://docs.aws.amazon.com/redshift/latest/dg/r_SELECT_list.html>
     pub opt_alias: Option<Ident>,
+    /// ClickHouse column transformations in source order.
+    pub column_transformers: Vec<ColumnTransformer>,
 }
 
 impl Default for WildcardAdditionalOptions {
@@ -971,6 +980,7 @@ impl Default for WildcardAdditionalOptions {
             opt_replace: None,
             opt_rename: None,
             opt_alias: None,
+            column_transformers: vec![],
         }
     }
 }
@@ -992,10 +1002,47 @@ impl fmt::Display for WildcardAdditionalOptions {
         if let Some(rename) = &self.opt_rename {
             write!(f, " {rename}")?;
         }
+        for transformer in &self.column_transformers {
+            write!(f, " {transformer}")?;
+        }
         if let Some(alias) = &self.opt_alias {
             write!(f, " AS {alias}")?;
         }
         Ok(())
+    }
+}
+
+/// A ClickHouse column transformer.
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
+pub enum ColumnTransformer {
+    /// Apply a function or lambda to every matched column.
+    Apply {
+        /// Function identifier, parameterized function, or lambda.
+        function: Box<Expr>,
+        /// Optional prefix for resulting column names.
+        prefix: Option<String>,
+    },
+    /// Exclude selected columns.
+    Except(ExceptSelectItem),
+    /// Replace selected column expressions.
+    Replace(ReplaceSelectItem),
+}
+
+impl fmt::Display for ColumnTransformer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Apply { function, prefix } => {
+                write!(f, "APPLY({function}")?;
+                if let Some(prefix) = prefix {
+                    write!(f, ", '{}'", escape_quoted_string(prefix, '\''))?;
+                }
+                write!(f, ")")
+            }
+            Self::Except(except) => except.fmt(f),
+            Self::Replace(replace) => replace.fmt(f),
+        }
     }
 }
 
@@ -1192,6 +1239,13 @@ impl fmt::Display for SelectItem {
         use core::fmt::Write;
         match &self {
             SelectItem::UnnamedExpr(expr) => expr.fmt(f),
+            SelectItem::ExprWithColumnTransformers { expr, transformers } => {
+                expr.fmt(f)?;
+                for transformer in transformers {
+                    write!(f, " {transformer}")?;
+                }
+                Ok(())
+            }
             SelectItem::ExprWithAlias { expr, alias } => {
                 expr.fmt(f)?;
                 f.write_str(" AS ")?;

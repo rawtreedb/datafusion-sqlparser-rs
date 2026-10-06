@@ -1237,6 +1237,16 @@ pub trait Dialect: Debug + Any {
         false
     }
 
+    /// Supports ordered APPLY, EXCEPT, and REPLACE column transformers.
+    fn supports_column_transformers(&self) -> bool {
+        false
+    }
+
+    /// Supports tuple field positions tokenized as a leading-dot number.
+    fn supports_numeric_field_access(&self) -> bool {
+        false
+    }
+
     /// Supports ClickHouse JSON subcolumns: `.:Type`, `.^path`, `.@path`, and `[]`.
     fn supports_json_subcolumns(&self) -> bool {
         false

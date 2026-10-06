@@ -15,7 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use crate::dialect::Dialect;
+use crate::{
+    dialect::Dialect,
+    keywords::{self, Keyword},
+    parser::Parser,
+};
 
 /// A [`Dialect`] for [ClickHouse](https://clickhouse.com/).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -29,6 +33,19 @@ impl Dialect for ClickHouseDialect {
 
     fn supports_insert_column_wildcard(&self) -> bool {
         true
+    }
+
+    fn supports_column_transformers(&self) -> bool {
+        true
+    }
+
+    fn supports_numeric_field_access(&self) -> bool {
+        true
+    }
+
+    fn is_column_alias(&self, kw: &Keyword, _parser: &mut Parser) -> bool {
+        !matches!(kw, Keyword::SETTINGS | Keyword::FORMAT | Keyword::APPLY)
+            && !keywords::RESERVED_FOR_COLUMN_ALIAS.contains(kw)
     }
 
     fn supports_json_subcolumns(&self) -> bool {

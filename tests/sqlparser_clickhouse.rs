@@ -2099,3 +2099,49 @@ fn clickhouse_json_subcolumns() {
         );
     }
 }
+
+#[test]
+fn clickhouse_column_transformers() {
+    for sql in [
+        "SELECT * APPLY(sum) FROM events",
+        "SELECT events.* APPLY(abs) FROM events",
+        "SELECT COLUMNS('x') APPLY(sum) FROM events",
+        "SELECT * EXCEPT (id) APPLY(sum) REPLACE (1 AS total) APPLY(toString) FROM events",
+        "SELECT * APPLY(x -> x + 1) FROM events",
+        "SELECT * APPLY(quantile(0.5), 'median_') FROM events",
+        "INSERT INTO daily SELECT * APPLY(abs) FROM events",
+    ] {
+        clickhouse().verified_stmt(sql);
+    }
+    clickhouse().one_statement_parses_to(
+        "SELECT * APPLY sum FROM events",
+        "SELECT * APPLY(sum) FROM events",
+    );
+    for sql in [
+        "SELECT * APPLY()",
+        "SELECT * APPLY(1)",
+        "SELECT * APPLY(sum, 1)",
+    ] {
+        assert!(
+            Parser::parse_sql(&ClickHouseDialect {}, sql).is_err(),
+            "{sql}"
+        );
+    }
+    assert!(Parser::parse_sql(&PostgreSqlDialect {}, "SELECT * APPLY(sum) FROM events").is_err());
+}
+
+#[test]
+fn clickhouse_numeric_tuple_access_and_select_settings() {
+    clickhouse().one_statement_parses_to("SELECT tuple(1, 2).1", "SELECT tuple(1, 2) . 1");
+    clickhouse().one_statement_parses_to(
+        "SELECT tuple(tuple(1)).1.1",
+        "SELECT tuple(tuple(1)) . 1 . 1",
+    );
+    clickhouse().verified_stmt("SELECT 0.1, 1.2");
+    assert!(Parser::parse_sql(&ClickHouseDialect {}, "SELECT .1").is_ok());
+    clickhouse().verified_stmt("SELECT toUInt32(1) SETTINGS max_threads = 1");
+    clickhouse().verified_stmt("SELECT 1 FORMAT JSONEachRow");
+    clickhouse().verified_stmt("SELECT 1 AS SETTINGS");
+    clickhouse().verified_stmt("SELECT 1 AS FORMAT");
+    assert!(Parser::parse_sql(&ClickHouseDialect {}, "SELECT toUInt32(1) SETTINGS").is_err());
+}

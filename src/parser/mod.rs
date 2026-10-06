@@ -2199,6 +2199,18 @@ impl<'a> Parser<'a> {
                         }
                     }
                 }
+            } else if self.dialect.supports_numeric_field_access()
+                && matches!(&self.peek_token_ref().token, Token::Number(n, false)
+                    if n.strip_prefix('.').is_some_and(|digits| !digits.is_empty() && digits.bytes().all(|c| c.is_ascii_digit())))
+            {
+                let token = self.next_token();
+                if let Token::Number(number, _) = token.token {
+                    let value = Value::Number(
+                        Self::parse(number[1..].to_string(), token.span.start)?,
+                        false,
+                    );
+                    chain.push(AccessExpr::Dot(Expr::Value(value.with_span(token.span))));
+                }
             } else if !self.dialect.supports_partiql()
                 && self.peek_token_ref().token == Token::LBracket
             {
@@ -19297,6 +19309,25 @@ impl<'a> Parser<'a> {
                     self.parse_wildcard_additional_options(wildcard_token)?,
                 ))
             }
+            Expr::Function(function)
+                if self.dialect.supports_column_transformers()
+                    && function.name.0.len() == 1
+                    && function.name.0[0]
+                        .as_ident()
+                        .is_some_and(|ident| ident.value.eq_ignore_ascii_case("COLUMNS"))
+                    && matches!(
+                        self.peek_token_ref().token,
+                        Token::Word(Word {
+                            keyword: Keyword::APPLY | Keyword::EXCEPT | Keyword::REPLACE,
+                            ..
+                        })
+                    ) =>
+            {
+                Ok(SelectItem::ExprWithColumnTransformers {
+                    expr: Expr::Function(function),
+                    transformers: self.parse_column_transformers()?,
+                })
+            }
             expr if self.dialect.supports_select_item_multi_column_alias()
                 && self.peek_keyword(Keyword::AS)
                 && self.peek_nth_token(1).token == Token::LParen =>
@@ -19370,7 +19401,48 @@ impl<'a> Parser<'a> {
             opt_rename,
             opt_replace,
             opt_alias,
+            column_transformers: if self.dialect.supports_column_transformers() {
+                self.parse_column_transformers()?
+            } else {
+                vec![]
+            },
         })
+    }
+
+    fn parse_column_transformers(&mut self) -> Result<Vec<ColumnTransformer>, ParserError> {
+        let mut transformers = vec![];
+        loop {
+            if self.parse_keyword(Keyword::APPLY) {
+                let parenthesized = self.consume_token(&Token::LParen);
+                let function = self.parse_expr()?;
+                if !matches!(
+                    function,
+                    Expr::Identifier(_) | Expr::Function(_) | Expr::Lambda(_)
+                ) {
+                    return self
+                        .expected_ref("a function or lambda in APPLY", self.peek_token_ref());
+                }
+                let prefix = if parenthesized && self.consume_token(&Token::Comma) {
+                    Some(self.parse_literal_string()?)
+                } else {
+                    None
+                };
+                if parenthesized {
+                    self.expect_token(&Token::RParen)?;
+                }
+                transformers.push(ColumnTransformer::Apply {
+                    function: Box::new(function),
+                    prefix,
+                });
+            } else if let Some(except) = self.parse_optional_select_item_except()? {
+                transformers.push(ColumnTransformer::Except(except));
+            } else if let Some(replace) = self.parse_optional_select_item_replace()? {
+                transformers.push(ColumnTransformer::Replace(replace));
+            } else {
+                break;
+            }
+        }
+        Ok(transformers)
     }
 
     /// Parse an [`Ilike`](IlikeSelectItem) information for wildcard select items.

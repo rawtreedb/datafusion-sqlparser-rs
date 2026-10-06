@@ -1888,6 +1888,9 @@ impl Spanned for SelectItem {
     fn span(&self) -> Span {
         match self {
             SelectItem::UnnamedExpr(expr) => expr.span(),
+            SelectItem::ExprWithColumnTransformers { expr, transformers } => {
+                union_spans(iter::once(expr.span()).chain(transformers.iter().map(|t| t.span())))
+            }
             SelectItem::ExprWithAlias { expr, alias } => expr.span().union(&alias.span),
             SelectItem::ExprWithAliases { expr, aliases } => {
                 union_spans(iter::once(expr.span()).chain(aliases.iter().map(|i| i.span)))
@@ -1902,6 +1905,16 @@ impl Spanned for SelectItem {
     }
 }
 
+impl Spanned for crate::ast::ColumnTransformer {
+    fn span(&self) -> Span {
+        match self {
+            Self::Apply { function, .. } => function.span(),
+            Self::Except(except) => except.span(),
+            Self::Replace(replace) => replace.span(),
+        }
+    }
+}
+
 impl Spanned for WildcardAdditionalOptions {
     fn span(&self) -> Span {
         let WildcardAdditionalOptions {
@@ -1912,6 +1925,7 @@ impl Spanned for WildcardAdditionalOptions {
             opt_replace,
             opt_rename,
             opt_alias,
+            column_transformers,
         } = self;
 
         union_spans(
@@ -1921,7 +1935,8 @@ impl Spanned for WildcardAdditionalOptions {
                 .chain(opt_rename.as_ref().map(|i| i.span()))
                 .chain(opt_replace.as_ref().map(|i| i.span()))
                 .chain(opt_except.as_ref().map(|i| i.span()))
-                .chain(opt_alias.as_ref().map(|i| i.span)),
+                .chain(opt_alias.as_ref().map(|i| i.span))
+                .chain(column_transformers.iter().map(|t| t.span())),
         )
     }
 }
