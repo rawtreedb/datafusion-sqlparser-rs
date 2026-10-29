@@ -132,6 +132,7 @@ fn parse_create_procedure() {
                 begin_token: AttachedToken::empty(),
                 statements: vec![Statement::Query(Box::new(Query {
                     with: None,
+                    limit_by: None,
                     limit_clause: None,
                     fetch: None,
                     locks: vec![],
@@ -1397,6 +1398,7 @@ fn parse_substring_in_select() {
                         flavor: SelectFlavor::Standard,
                     }))),
                     order_by: None,
+                    limit_by: None,
                     limit_clause: None,
                     fetch: None,
                     locks: vec![],
@@ -1499,6 +1501,7 @@ fn parse_mssql_declare() {
             }),
             Statement::Query(Box::new(Query {
                 with: None,
+                limit_by: None,
                 limit_clause: None,
                 fetch: None,
                 locks: vec![],

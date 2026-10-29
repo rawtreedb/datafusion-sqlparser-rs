@@ -534,6 +534,7 @@ fn parse_update_set_from() {
                             flavor: SelectFlavor::Standard,
                         }))),
                         order_by: None,
+                        limit_by: None,
                         limit_clause: None,
                         fetch: None,
                         locks: vec![],
@@ -960,7 +961,6 @@ fn parse_simple_select() {
     let expected_limit_clause = LimitClause::LimitOffset {
         limit: Some(Expr::value(number("5"))),
         offset: None,
-        limit_by: vec![],
     };
     assert_eq!(Some(expected_limit_clause), select.limit_clause);
 }
@@ -984,7 +984,6 @@ fn parse_limit_is_not_an_alias() {
     let expected_limit_clause = LimitClause::LimitOffset {
         limit: Some(Expr::value(number("1"))),
         offset: None,
-        limit_by: vec![],
     };
     assert_eq!(Some(expected_limit_clause), ast.limit_clause);
 
@@ -992,7 +991,6 @@ fn parse_limit_is_not_an_alias() {
     let expected_limit_clause = LimitClause::LimitOffset {
         limit: Some(Expr::value(number("5"))),
         offset: None,
-        limit_by: vec![],
     };
     assert_eq!(Some(expected_limit_clause), ast.limit_clause);
 }
@@ -2901,7 +2899,6 @@ fn parse_select_order_by_limit() {
     let expected_limit_clause = LimitClause::LimitOffset {
         limit: Some(Expr::value(number("2"))),
         offset: None,
-        limit_by: vec![],
     };
     assert_eq!(Some(expected_limit_clause), select.limit_clause);
 }
@@ -3067,7 +3064,6 @@ fn parse_select_order_by_nulls_order() {
     let expected_limit_clause = LimitClause::LimitOffset {
         limit: Some(Expr::value(number("2"))),
         offset: None,
-        limit_by: vec![],
     };
     assert_eq!(Some(expected_limit_clause), select.limit_clause);
 }
@@ -4853,6 +4849,7 @@ fn parse_create_table_as_table() {
             schema_name: None,
         }))),
         order_by: None,
+        limit_by: None,
         limit_clause: None,
         fetch: None,
         locks: vec![],
@@ -4879,6 +4876,7 @@ fn parse_create_table_as_table() {
             schema_name: Some(Ident::new("schema_name")),
         }))),
         order_by: None,
+        limit_by: None,
         limit_clause: None,
         fetch: None,
         locks: vec![],
@@ -7055,6 +7053,7 @@ fn parse_interval_and_or_xor() {
             flavor: SelectFlavor::Standard,
         }))),
         order_by: None,
+        limit_by: None,
         limit_clause: None,
         fetch: None,
         locks: vec![],
@@ -9177,7 +9176,6 @@ fn parse_offset() {
             value: Expr::value(number("2")),
             rows: OffsetRows::Rows,
         }),
-        limit_by: vec![],
     });
     let ast = dialects.verified_query("SELECT foo FROM bar OFFSET 2 ROWS");
     assert_eq!(&ast.limit_clause, expected_limit_clause);
@@ -9206,7 +9204,6 @@ fn parse_offset() {
             value: Expr::value(number("0")),
             rows: OffsetRows::Rows,
         }),
-        limit_by: vec![],
     };
     let ast = dialects.verified_query("SELECT 'foo' OFFSET 0 ROWS");
     assert_eq!(ast.limit_clause, Some(expected_limit_clause));
@@ -9216,7 +9213,6 @@ fn parse_offset() {
             value: Expr::value(number("1")),
             rows: OffsetRows::Row,
         }),
-        limit_by: vec![],
     };
     let ast = dialects.verified_query("SELECT 'foo' OFFSET 1 ROW");
     assert_eq!(ast.limit_clause, Some(expected_limit_clause));
@@ -9226,7 +9222,6 @@ fn parse_offset() {
             value: Expr::value(number("2")),
             rows: OffsetRows::None,
         }),
-        limit_by: vec![],
     };
     let ast = dialects.verified_query("SELECT 'foo' OFFSET 2");
     assert_eq!(ast.limit_clause, Some(expected_limit_clause));
@@ -9285,7 +9280,6 @@ fn parse_fetch() {
             value: Expr::value(number("2")),
             rows: OffsetRows::Rows,
         }),
-        limit_by: vec![],
     });
     assert_eq!(ast.limit_clause, expected_limit_clause);
     assert_eq!(ast.fetch, fetch_first_two_rows_only);
@@ -9309,7 +9303,6 @@ fn parse_fetch() {
             value: Expr::value(number("2")),
             rows: OffsetRows::Rows,
         }),
-        limit_by: vec![],
     });
     assert_eq!(&ast.limit_clause, expected_limit_clause);
     assert_eq!(ast.fetch, fetch_first_two_rows_only);
@@ -10501,6 +10494,7 @@ fn parse_merge() {
                             flavor: SelectFlavor::Standard,
                         }))),
                         order_by: None,
+                        limit_by: None,
                         limit_clause: None,
                         fetch: None,
                         locks: vec![],
@@ -10961,7 +10955,6 @@ fn test_placeholder() {
             value: Expr::Value((Value::Placeholder("$2".into())).with_empty_span()),
             rows: OffsetRows::None,
         }),
-        limit_by: vec![],
     };
     assert_eq!(ast.limit_clause, Some(expected_limit_clause));
 
@@ -11053,7 +11046,6 @@ fn parse_offset_and_limit() {
             value: Expr::value(number("2")),
             rows: OffsetRows::None,
         }),
-        limit_by: vec![],
     });
     let ast = verified_query(sql);
     assert_eq!(ast.limit_clause, expected_limit_clause);
@@ -11082,7 +11074,6 @@ fn parse_offset_and_limit() {
             },
             rows: OffsetRows::None,
         }),
-        limit_by: vec![],
     };
     assert_eq!(ast.limit_clause, Some(expected_limit_clause),);
 
@@ -13046,6 +13037,7 @@ fn parse_unload() {
                     flavor: SelectFlavor::Standard,
                 }))),
                 with: None,
+                limit_by: None,
                 limit_clause: None,
                 fetch: None,
                 locks: vec![],
@@ -14632,6 +14624,7 @@ fn test_extract_seconds_ok() {
             flavor: SelectFlavor::Standard,
         }))),
         order_by: None,
+        limit_by: None,
         limit_clause: None,
         fetch: None,
         locks: vec![],
@@ -16824,6 +16817,7 @@ fn test_select_from_first() {
                 flavor,
             }))),
             order_by: None,
+            limit_by: None,
             limit_clause: None,
             fetch: None,
             locks: vec![],

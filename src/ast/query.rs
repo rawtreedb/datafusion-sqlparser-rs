@@ -44,6 +44,8 @@ pub struct Query {
     pub body: Box<SetExpr>,
     /// ORDER BY
     pub order_by: Option<OrderBy>,
+    /// ClickHouse `LIMIT <limit> [OFFSET <offset>] BY <expr>, ...`.
+    pub limit_by: Option<LimitBy>,
     /// `LIMIT ... OFFSET ... | LIMIT <offset>, <limit>`
     pub limit_clause: Option<LimitClause>,
     /// `FETCH { FIRST | NEXT } <N> [ PERCENT ] { ROW | ROWS } | { ONLY | WITH TIES }`
@@ -80,6 +82,9 @@ impl fmt::Display for Query {
             order_by.fmt(f)?;
         }
 
+        if let Some(ref limit_by) = self.limit_by {
+            limit_by.fmt(f)?;
+        }
         if let Some(ref limit_clause) = self.limit_clause {
             limit_clause.fmt(f)?;
         }
@@ -3172,21 +3177,40 @@ impl fmt::Display for OrderByOptions {
     }
 }
 
+/// A per-group limit, independent of the query's overall `LIMIT`.
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
+pub struct LimitBy {
+    /// Maximum rows per group.
+    pub limit: Expr,
+    /// Rows to skip in each group.
+    pub offset: Option<Offset>,
+    /// Grouping expressions.
+    pub by: Vec<Expr>,
+}
+
+impl fmt::Display for LimitBy {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, " LIMIT {}", self.limit)?;
+        if let Some(offset) = &self.offset {
+            write!(f, " {offset}")?;
+        }
+        write!(f, " BY {}", display_comma_separated(&self.by))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 /// Represents the different syntactic forms of `LIMIT` clauses.
 pub enum LimitClause {
-    /// Standard SQL `LIMIT` syntax (optionally `BY` and `OFFSET`).
-    ///
-    /// `LIMIT <limit> [BY <expr>,<expr>,...] [OFFSET <offset>]`
+    /// Standard SQL `LIMIT <limit> [OFFSET <offset>]` syntax.
     LimitOffset {
         /// `LIMIT { <N> | ALL }` expression.
         limit: Option<Expr>,
         /// Optional `OFFSET` expression with optional `ROW(S)` keyword.
         offset: Option<Offset>,
-        /// Optional `BY { <expr>,... }` list used by some dialects (ClickHouse).
-        limit_by: Vec<Expr>,
     },
     /// MySQL-specific syntax: `LIMIT <offset>, <limit>` (order reversed).
     OffsetCommaLimit {
@@ -3200,20 +3224,12 @@ pub enum LimitClause {
 impl fmt::Display for LimitClause {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            LimitClause::LimitOffset {
-                limit,
-                limit_by,
-                offset,
-            } => {
+            LimitClause::LimitOffset { limit, offset } => {
                 if let Some(ref limit) = limit {
                     write!(f, " LIMIT {limit}")?;
                 }
                 if let Some(ref offset) = offset {
                     write!(f, " {offset}")?;
-                }
-                if !limit_by.is_empty() {
-                    debug_assert!(limit.is_some());
-                    write!(f, " BY {}", display_separated(limit_by, ", "))?;
                 }
                 Ok(())
             }

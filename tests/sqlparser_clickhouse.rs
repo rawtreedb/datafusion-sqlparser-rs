@@ -1270,7 +1270,6 @@ fn parse_select_order_by_with_fill_interpolate() {
         Some(LimitClause::LimitOffset {
             limit: Some(Expr::value(number("2"))),
             offset: None,
-            limit_by: vec![]
         })
     );
 }
@@ -2144,4 +2143,89 @@ fn clickhouse_numeric_tuple_access_and_select_settings() {
     clickhouse().verified_stmt("SELECT 1 AS SETTINGS");
     clickhouse().verified_stmt("SELECT 1 AS FORMAT");
     assert!(Parser::parse_sql(&ClickHouseDialect {}, "SELECT toUInt32(1) SETTINGS").is_err());
+}
+
+#[test]
+fn parse_limit_by_with_overall_limit() {
+    let query = clickhouse_and_generic().verified_query(
+        "SELECT query_type, query FROM query_log ORDER BY event_time DESC LIMIT 1 BY query_type, query LIMIT 1000",
+    );
+    assert_eq!(
+        query.limit_by,
+        Some(LimitBy {
+            limit: Expr::value(number("1")),
+            offset: None,
+            by: vec![
+                Expr::Identifier(Ident::new("query_type")),
+                Expr::Identifier(Ident::new("query"))
+            ],
+        })
+    );
+    assert_eq!(
+        query.limit_clause,
+        Some(LimitClause::LimitOffset {
+            limit: Some(Expr::value(number("1000"))),
+            offset: None,
+        })
+    );
+    for sql in [
+        "SELECT * FROM t LIMIT 2 OFFSET 1 BY a LIMIT 10 OFFSET 3",
+        "SELECT * FROM t LIMIT 2 BY a LIMIT 3, 10",
+        "SELECT * FROM t LIMIT 2 OFFSET 1 BY a",
+        "SELECT * FROM t LIMIT 2 BY a, lower(b) LIMIT 10 SETTINGS max_execution_time = 15 FORMAT JSON",
+        "WITH t AS (SELECT * FROM s LIMIT 1 BY a LIMIT 10) SELECT * FROM t LIMIT 2 BY a LIMIT 5",
+        "SELECT * FROM (SELECT * FROM t LIMIT 1 BY a LIMIT 10) LIMIT 2",
+        "SELECT * FROM t LIMIT 1 BY a LIMIT 0",
+    ] {
+        clickhouse_and_generic().verified_stmt(sql);
+    }
+    clickhouse_and_generic().one_statement_parses_to(
+        "SELECT * FROM t LIMIT 1, 2 BY a LIMIT 3, 10",
+        "SELECT * FROM t LIMIT 2 OFFSET 1 BY a LIMIT 3, 10",
+    );
+}
+
+#[test]
+fn reject_invalid_combined_limits() {
+    for sql in [
+        "SELECT * FROM t LIMIT 1 LIMIT 2",
+        "SELECT * FROM t LIMIT 1 BY a LIMIT 2 BY b",
+        "SELECT * FROM t LIMIT 1 BY a LIMIT 2 LIMIT 3",
+        "SELECT * FROM t LIMIT ALL BY a LIMIT 2",
+        "SELECT * FROM t OFFSET 1 BY a LIMIT 2",
+        "SELECT * FROM t LIMIT 1 BY",
+        "SELECT * FROM t LIMIT 1 BY a LIMIT",
+    ] {
+        clickhouse_and_generic()
+            .parse_sql_statements(sql)
+            .expect_err(sql);
+    }
+    Parser::parse_sql(
+        &PostgreSqlDialect {},
+        "SELECT * FROM t LIMIT 1 BY a LIMIT 2",
+    )
+    .expect_err("LIMIT BY remains dialect-specific");
+}
+
+#[test]
+#[cfg(feature = "visitor")]
+fn visit_statements_inside_both_limits() {
+    use core::ops::ControlFlow;
+    for sql in [
+        "SELECT * FROM t LIMIT (WITH 1 AS x INSERT INTO u SELECT x) BY a LIMIT 10",
+        "SELECT * FROM t LIMIT 1 OFFSET (WITH 1 AS x INSERT INTO u SELECT x) BY a LIMIT 10",
+        "SELECT * FROM t LIMIT 1 BY (WITH 1 AS x INSERT INTO u SELECT x) LIMIT 10",
+        "SELECT * FROM t LIMIT 1 BY a LIMIT (WITH 1 AS x INSERT INTO u SELECT x)",
+        "SELECT * FROM t LIMIT 1 BY a LIMIT 10 OFFSET (WITH 1 AS x INSERT INTO u SELECT x)",
+    ] {
+        let statements = Parser::parse_sql(&ClickHouseDialect {}, sql).unwrap();
+        let found_write = visit_statements(&statements, |statement| {
+            if matches!(statement, Statement::Insert(_)) {
+                ControlFlow::Break(())
+            } else {
+                ControlFlow::Continue(())
+            }
+        });
+        assert!(found_write.is_break(), "{sql}");
+    }
 }

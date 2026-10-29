@@ -2763,10 +2763,10 @@ fn test_export_data() {
                     },]),
                     interpolate: None,
                 }),
+                limit_by: None,
                 limit_clause: Some(LimitClause::LimitOffset {
                     limit: Some(Expr::Value(number("10").with_empty_span())),
                     offset: None,
-                    limit_by: vec![],
                 }),
                 fetch: None,
                 locks: vec![],
@@ -2869,10 +2869,10 @@ fn test_export_data() {
                     },]),
                     interpolate: None,
                 }),
+                limit_by: None,
                 limit_clause: Some(LimitClause::LimitOffset {
                     limit: Some(Expr::Value(number("10").with_empty_span())),
                     offset: None,
-                    limit_by: vec![],
                 }),
                 fetch: None,
                 locks: vec![],

@@ -1491,6 +1491,7 @@ fn parse_escaped_quote_identifiers_with_escape() {
                 flavor: SelectFlavor::Standard,
             }))),
             order_by: None,
+            limit_by: None,
             limit_clause: None,
             fetch: None,
             locks: vec![],
@@ -1548,6 +1549,7 @@ fn parse_escaped_quote_identifiers_with_no_escape() {
                 flavor: SelectFlavor::Standard,
             }))),
             order_by: None,
+            limit_by: None,
             limit_clause: None,
             fetch: None,
             locks: vec![],
@@ -1597,6 +1599,7 @@ fn parse_escaped_backticks_with_escape() {
                 flavor: SelectFlavor::Standard,
             }))),
             order_by: None,
+            limit_by: None,
             limit_clause: None,
             fetch: None,
             locks: vec![],
@@ -1650,6 +1653,7 @@ fn parse_escaped_backticks_with_no_escape() {
                 flavor: SelectFlavor::Standard,
             }))),
             order_by: None,
+            limit_by: None,
             limit_clause: None,
             fetch: None,
             locks: vec![],
@@ -1970,6 +1974,7 @@ fn parse_simple_insert() {
                         ]
                     })),
                     order_by: None,
+                    limit_by: None,
                     limit_clause: None,
                     fetch: None,
                     locks: vec![],
@@ -2026,6 +2031,7 @@ fn parse_ignore_insert() {
                         ])]
                     })),
                     order_by: None,
+                    limit_by: None,
                     limit_clause: None,
                     fetch: None,
                     locks: vec![],
@@ -2082,6 +2088,7 @@ fn parse_priority_insert() {
                         ])]
                     })),
                     order_by: None,
+                    limit_by: None,
                     limit_clause: None,
                     fetch: None,
                     locks: vec![],
@@ -2135,6 +2142,7 @@ fn parse_priority_insert() {
                         ])]
                     })),
                     order_by: None,
+                    limit_by: None,
                     limit_clause: None,
                     fetch: None,
                     locks: vec![],
@@ -2189,6 +2197,7 @@ fn parse_insert_as() {
                         )])]
                     })),
                     order_by: None,
+                    limit_by: None,
                     limit_clause: None,
                     fetch: None,
                     locks: vec![],
@@ -2256,6 +2265,7 @@ fn parse_insert_as() {
                         ])]
                     })),
                     order_by: None,
+                    limit_by: None,
                     limit_clause: None,
                     fetch: None,
                     locks: vec![],
@@ -2313,6 +2323,7 @@ fn parse_replace_insert() {
                         ])]
                     })),
                     order_by: None,
+                    limit_by: None,
                     limit_clause: None,
                     fetch: None,
                     locks: vec![],
@@ -2358,6 +2369,7 @@ fn parse_empty_row_insert() {
                         ]
                     })),
                     order_by: None,
+                    limit_by: None,
                     limit_clause: None,
                     fetch: None,
                     locks: vec![],
@@ -2424,6 +2436,7 @@ fn parse_insert_with_on_duplicate_update() {
                         ])]
                     })),
                     order_by: None,
+                    limit_by: None,
                     limit_clause: None,
                     fetch: None,
                     locks: vec![],
@@ -3400,6 +3413,7 @@ fn parse_substring_in_select() {
                         flavor: SelectFlavor::Standard,
                     }))),
                     order_by: None,
+                    limit_by: None,
                     limit_clause: None,
                     fetch: None,
                     locks: vec![],
@@ -3731,6 +3745,7 @@ fn parse_hex_string_introducer() {
                 flavor: SelectFlavor::Standard,
             }))),
             order_by: None,
+            limit_by: None,
             limit_clause: None,
             fetch: None,
             locks: vec![],

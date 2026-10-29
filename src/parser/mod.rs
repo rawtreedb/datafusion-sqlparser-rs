@@ -13700,7 +13700,7 @@ impl<'a> Parser<'a> {
             None
         };
 
-        let (limit, limit_by) = if self.parse_keyword(Keyword::LIMIT) {
+        let limit = if self.parse_keyword(Keyword::LIMIT) {
             let expr = self.parse_limit()?;
 
             if self.dialect.supports_limit_comma()
@@ -13719,30 +13719,54 @@ impl<'a> Parser<'a> {
                 }));
             }
 
-            let limit_by = if self.dialect.supports_limit_by() && self.parse_keyword(Keyword::BY) {
-                Some(self.parse_comma_separated(Parser::parse_expr)?)
-            } else {
-                None
-            };
-
-            (Some(expr), limit_by)
+            Some(expr)
         } else {
-            (None, None)
+            None
         };
 
         if offset.is_none() && limit.is_some() && self.parse_keyword(Keyword::OFFSET) {
             offset = Some(self.parse_offset()?);
         }
 
-        if offset.is_some() || (limit.is_some() && limit != Some(None)) || limit_by.is_some() {
+        if offset.is_some() || (limit.is_some() && limit != Some(None)) {
             Ok(Some(LimitClause::LimitOffset {
                 limit: limit.unwrap_or_default(),
                 offset,
-                limit_by: limit_by.unwrap_or_default(),
             }))
         } else {
             Ok(None)
         }
+    }
+
+    fn parse_optional_limit_by(
+        &mut self,
+        limit_clause: &mut Option<LimitClause>,
+    ) -> Result<Option<LimitBy>, ParserError> {
+        if !self.dialect.supports_limit_by() || !self.parse_keyword(Keyword::BY) {
+            return Ok(None);
+        }
+        let (limit, offset) = match limit_clause.take() {
+            Some(LimitClause::LimitOffset {
+                limit: Some(limit),
+                offset,
+            }) => (limit, offset),
+            Some(LimitClause::OffsetCommaLimit { offset, limit }) => (
+                limit,
+                Some(Offset {
+                    value: offset,
+                    rows: OffsetRows::None,
+                }),
+            ),
+            _ => {
+                return parser_err!(
+                    "BY requires a preceding LIMIT expression",
+                    self.peek_token().span.start
+                )
+            }
+        };
+        let by = self.parse_comma_separated(Parser::parse_expr)?;
+        *limit_clause = self.parse_optional_limit_clause()?;
+        Ok(Some(LimitBy { limit, offset, by }))
     }
 
     /// Parse a table object for insertion
@@ -14667,6 +14691,7 @@ impl<'a> Parser<'a> {
                 with,
                 body: self.parse_insert_setexpr_boxed(self.get_current_token().clone())?,
                 order_by: None,
+                limit_by: None,
                 limit_clause: None,
                 fetch: None,
                 locks: vec![],
@@ -14681,6 +14706,7 @@ impl<'a> Parser<'a> {
                 with,
                 body: self.parse_update_setexpr_boxed(self.get_current_token().clone())?,
                 order_by: None,
+                limit_by: None,
                 limit_clause: None,
                 fetch: None,
                 locks: vec![],
@@ -14694,6 +14720,7 @@ impl<'a> Parser<'a> {
             Ok(Query {
                 with,
                 body: self.parse_delete_setexpr_boxed(self.get_current_token().clone())?,
+                limit_by: None,
                 limit_clause: None,
                 order_by: None,
                 fetch: None,
@@ -14708,6 +14735,7 @@ impl<'a> Parser<'a> {
             Ok(Query {
                 with,
                 body: self.parse_merge_setexpr_boxed(self.get_current_token().clone())?,
+                limit_by: None,
                 limit_clause: None,
                 order_by: None,
                 fetch: None,
@@ -14724,6 +14752,7 @@ impl<'a> Parser<'a> {
             let order_by = self.parse_optional_order_by()?;
 
             let mut limit_clause = self.parse_optional_limit_clause()?;
+            let limit_by = self.parse_optional_limit_by(&mut limit_clause)?;
 
             let settings = self.parse_settings()?;
 
@@ -14775,6 +14804,7 @@ impl<'a> Parser<'a> {
                 with,
                 body,
                 order_by,
+                limit_by,
                 limit_clause,
                 fetch,
                 locks,
@@ -16772,6 +16802,7 @@ impl<'a> Parser<'a> {
                     with: None,
                     body: Box::new(values),
                     order_by: None,
+                    limit_by: None,
                     limit_clause: None,
                     fetch: None,
                     locks: vec![],

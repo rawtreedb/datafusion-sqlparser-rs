@@ -1804,6 +1804,7 @@ fn parse_copy_to() {
                     flavor: SelectFlavor::Standard,
                 }))),
                 order_by: None,
+                limit_by: None,
                 limit_clause: None,
                 fetch: None,
                 locks: vec![],
@@ -3651,6 +3652,7 @@ fn parse_array_subquery_expr() {
                     }))),
                 }),
                 order_by: None,
+                limit_by: None,
                 limit_clause: None,
                 fetch: None,
                 locks: vec![],
@@ -6147,6 +6149,7 @@ fn test_simple_postgres_insert_with_alias() {
                     ])]
                 })),
                 order_by: None,
+                limit_by: None,
                 limit_clause: None,
                 fetch: None,
                 locks: vec![],
@@ -6231,6 +6234,7 @@ fn test_simple_postgres_insert_with_alias() {
                     ])]
                 })),
                 order_by: None,
+                limit_by: None,
                 limit_clause: None,
                 fetch: None,
                 locks: vec![],
@@ -6313,6 +6317,7 @@ fn test_simple_insert_with_quoted_alias() {
                     ])]
                 })),
                 order_by: None,
+                limit_by: None,
                 limit_clause: None,
                 fetch: None,
                 locks: vec![],
