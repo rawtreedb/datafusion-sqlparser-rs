@@ -18588,6 +18588,14 @@ impl<'a> Parser<'a> {
             // Hive lets you put table here regardless
             let table = self.parse_keyword(Keyword::TABLE);
             let table_object = self.parse_table_object()?;
+            let partition_by = if self.dialect.supports_insert_partition_by()
+                && matches!(table_object, TableObject::TableFunction(_))
+                && self.parse_keywords(&[Keyword::PARTITION, Keyword::BY])
+            {
+                Some(Box::new(self.parse_expr()?))
+            } else {
+                None
+            };
 
             // `BY NAME` is an INSERT clause, not a table alias.
             let table_alias = if self.dialect.supports_insert_table_alias()
@@ -18758,6 +18766,7 @@ impl<'a> Parser<'a> {
                 optimizer_hints,
                 or,
                 table: table_object,
+                partition_by,
                 table_alias,
                 ignore,
                 into,

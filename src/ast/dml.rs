@@ -16,7 +16,7 @@
 // under the License.
 
 #[cfg(not(feature = "std"))]
-use alloc::{boxed::Box, format, string::ToString, vec::Vec};
+use alloc::{boxed::Box, format, string::ToString, vec, vec::Vec};
 
 use core::fmt::{self, Display};
 #[cfg(feature = "serde")]
@@ -92,6 +92,8 @@ pub struct Insert {
     /// `table_name as foo` (for PostgreSQL)
     /// `table_name foo` (for Oracle)
     pub table_alias: Option<TableAliasWithoutColumns>,
+    /// ClickHouse `PARTITION BY` expression for a table-function destination.
+    pub partition_by: Option<Box<Expr>>,
     /// COLUMNS
     pub columns: Vec<InsertColumn>,
     /// `BY NAME` clause used by Databricks SQL.
@@ -233,6 +235,11 @@ impl Display for Insert {
             if !table_name.is_empty() {
                 write!(f, " {table_name} ")?;
             }
+        }
+
+        if let Some(partition_by) = &self.partition_by {
+            write!(f, "PARTITION BY {partition_by}")?;
+            SpaceOrNewline.fmt(f)?;
         }
 
         if !self.columns.is_empty() {

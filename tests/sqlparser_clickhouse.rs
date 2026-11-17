@@ -2145,3 +2145,148 @@ fn clickhouse_numeric_tuple_access_and_select_settings() {
     clickhouse().verified_stmt("SELECT 1 AS FORMAT");
     assert!(Parser::parse_sql(&ClickHouseDialect {}, "SELECT toUInt32(1) SETTINGS").is_err());
 }
+
+#[test]
+fn clickhouse_insert_partition_by() {
+    for sql in [
+        "INSERT INTO FUNCTION s3(export_config, filename = 'part_{_partition_id}.parquet') PARTITION BY id SELECT id FROM events",
+        "INSERT INTO TABLE FUNCTION s3(export_config) PARTITION BY (year, country) SELECT 2026 AS year, 'ES' AS country",
+        "INSERT INTO FUNCTION file('part_{_partition_id}.csv', 'CSV') PARTITION BY id % 2 VALUES (1), (2)",
+        "INSERT INTO FUNCTION s3(export_config) PARTITION BY 1 (id) SELECT id FROM events",
+        "INSERT INTO FUNCTION s3(export_config) PARTITION BY id WITH rows AS (SELECT id FROM events) SELECT id FROM rows",
+        "INSERT INTO FUNCTION s3(export_config) PARTITION BY id SELECT id FROM events SETTINGS max_execution_time = 500",
+        "INSERT INTO FUNCTION s3(export_config) PARTITION BY id FORMAT CSV 1",
+    ] {
+        clickhouse().verified_stmt(sql);
+    }
+}
+
+#[test]
+fn clickhouse_insert_partition_by_export_regression() {
+    let sql = r#"INSERT INTO FUNCTION s3(export_config, filename = '_test/{_partition_id}/year/2026/month/11/day/16/hour/20/part-0000.parquet')
+  PARTITION BY concat(
+      'system_id/',  ifNull(attrs.systemid::Nullable(String), 'unknown'),
+      '/service/',   ifNull(attrs.c2cService::Nullable(String), 'unknown'),
+      '/partition/', ifNull(attrs.c2cPartition::Nullable(String), 'unknown'),
+      '/stage/',     ifNull(attrs.c2cStage::Nullable(String), 'unknown'))
+  SELECT Timestamp::DateTime64(9) AS timestamp,
+         line.level::Nullable(String) AS level,
+         toJSONString(__raw_data) AS raw
+  FROM events
+  WHERE attrs.systemid = 'checkout-api'
+    AND attrs.c2cStage = 'development'
+    AND Timestamp >= '2026-11-16 20:00:00'
+    AND Timestamp < '2026-11-16 20:05:00'
+  SETTINGS max_execution_time = 500, output_format_parquet_compression_method = 'zstd', s3_truncate_on_insert = 1"#;
+    let canonical = concat!(
+        "INSERT INTO FUNCTION s3(export_config, filename = '_test/{_partition_id}/year/2026/month/11/day/16/hour/20/part-0000.parquet') ",
+        "PARTITION BY concat('system_id/', ifNull(attrs.systemid::Nullable(STRING), 'unknown'), '/service/', ifNull(attrs.c2cService::Nullable(STRING), 'unknown'), '/partition/', ifNull(attrs.c2cPartition::Nullable(STRING), 'unknown'), '/stage/', ifNull(attrs.c2cStage::Nullable(STRING), 'unknown')) ",
+        "SELECT Timestamp::DateTime64(9) AS timestamp, line.level::Nullable(STRING) AS level, toJSONString(__raw_data) AS raw ",
+        "FROM events ",
+        "WHERE attrs.systemid = 'checkout-api' AND attrs.c2cStage = 'development' AND Timestamp >= '2026-11-16 20:00:00' AND Timestamp < '2026-11-16 20:05:00' ",
+        "SETTINGS max_execution_time = 500, output_format_parquet_compression_method = 'zstd', s3_truncate_on_insert = 1",
+    );
+    clickhouse().one_statement_parses_to(sql, canonical);
+}
+
+#[test]
+fn clickhouse_insert_partition_by_ast() {
+    let Statement::Insert(insert) = clickhouse().verified_stmt(
+        "INSERT INTO FUNCTION s3(export_config) PARTITION BY id SELECT id FROM events",
+    ) else {
+        panic!("expected INSERT");
+    };
+    assert_eq!(
+        insert.partition_by,
+        Some(Box::new(Expr::Identifier(Ident::new("id"))))
+    );
+    assert_eq!(insert.partitioned, None);
+
+    let Statement::Insert(insert) =
+        clickhouse().verified_stmt("INSERT INTO FUNCTION s3(export_config) SELECT id FROM events")
+    else {
+        panic!("expected INSERT");
+    };
+    assert_eq!(insert.partition_by, None);
+
+    let Statement::Insert(insert) =
+        TestedDialects::new(vec![Box::new(sqlparser::dialect::HiveDialect {})])
+            .verified_stmt("INSERT INTO events PARTITION (id = 1) SELECT id FROM source")
+    else {
+        panic!("expected INSERT");
+    };
+    assert!(insert.partitioned.is_some());
+    assert_eq!(insert.partition_by, None);
+}
+
+#[test]
+fn clickhouse_insert_partition_by_errors() {
+    for (sql, expected) in [
+        (
+            "INSERT INTO FUNCTION s3(export_config) PARTITION BY",
+            "Expected: an expression, found: EOF",
+        ),
+        (
+            "INSERT INTO FUNCTION s3(export_config) PARTITION BY (id SELECT id",
+            "Expected: ), found: SELECT",
+        ),
+        (
+            "INSERT INTO events PARTITION BY id SELECT id",
+            "Expected: (, found: BY",
+        ),
+        (
+            "INSERT INTO FUNCTION s3(export_config) PARTITION BY id PARTITION BY other SELECT id",
+            "Expected: (, found: BY",
+        ),
+    ] {
+        assert_eq!(
+            clickhouse().parse_sql_statements(sql),
+            Err(ParserError(expected.to_string())),
+            "{sql}"
+        );
+    }
+    for dialect in all_dialects_where(|d| !d.supports_insert_partition_by()).dialects {
+        assert!(
+            Parser::parse_sql(&*dialect, "INSERT INTO events PARTITION BY id SELECT id").is_err(),
+            "{dialect:?}"
+        );
+    }
+}
+
+#[test]
+fn clickhouse_insert_partition_by_span() {
+    use sqlparser::ast::Spanned;
+    use sqlparser::tokenizer::Location;
+
+    let sql = "INSERT INTO FUNCTION s3(export_config) PARTITION BY id FORMAT CSV";
+    let statements = Parser::parse_sql(&ClickHouseDialect {}, sql).unwrap();
+    assert_eq!(
+        statements[0].span(),
+        Span::new(Location::new(1, 1), Location::new(1, 55))
+    );
+}
+
+#[cfg(feature = "visitor")]
+#[test]
+fn clickhouse_insert_partition_by_visitor() {
+    use std::ops::ControlFlow;
+
+    let statement = clickhouse().verified_stmt(
+        "INSERT INTO FUNCTION s3(export_config) PARTITION BY (SELECT url('https://example.com') FROM partition_keys) SELECT id FROM events",
+    );
+    let mut relations = Vec::new();
+    let _ = visit_relations(&statement, |relation| {
+        relations.push(relation.to_string());
+        ControlFlow::<()>::Continue(())
+    });
+    assert!(relations.contains(&"partition_keys".to_string()));
+    let result = visit_expressions(&statement, |expr| {
+        if let Expr::Function(function) = expr {
+            if function.name.to_string() == "url" {
+                return ControlFlow::Break(());
+            }
+        }
+        ControlFlow::Continue(())
+    });
+    assert_eq!(result, ControlFlow::Break(()));
+}

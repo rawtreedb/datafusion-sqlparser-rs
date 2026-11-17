@@ -100,6 +100,10 @@ impl Dialect for ClickHouseDialect {
         true
     }
 
+    fn supports_insert_partition_by(&self) -> bool {
+        true
+    }
+
     fn supports_insert_format(&self) -> bool {
         true
     }
