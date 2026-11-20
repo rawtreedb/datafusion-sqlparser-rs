@@ -1374,6 +1374,7 @@ impl Spanned for Insert {
             into: _,   // bool
             table,
             table_alias,
+            partition_by,
             columns,
             by_name: _,   // bool
             overwrite: _, // bool
@@ -1400,6 +1401,7 @@ impl Spanned for Insert {
             core::iter::once(insert_token.0.span)
                 .chain(core::iter::once(table.span()))
                 .chain(table_alias.iter().map(|k| k.alias.span))
+                .chain(partition_by.iter().map(|i| i.span()))
                 .chain(columns.iter().map(|i| i.span()))
                 .chain(source.as_ref().map(|q| q.span()))
                 .chain(assignments.iter().map(|i| i.span()))

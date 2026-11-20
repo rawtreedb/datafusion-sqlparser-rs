@@ -1440,6 +1440,11 @@ pub trait Dialect: Debug + Any {
         false
     }
 
+    /// Supports `INSERT INTO FUNCTION ... PARTITION BY <expr>`.
+    fn supports_insert_partition_by(&self) -> bool {
+        false
+    }
+
     /// Does the dialect support table queries in insertion?
     ///
     /// e.g. `SELECT INTO (<query>) ...`

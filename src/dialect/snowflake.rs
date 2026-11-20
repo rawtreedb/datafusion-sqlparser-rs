@@ -1905,6 +1905,7 @@ fn parse_multi_table_insert(
         source: Some(source),
         assignments: vec![],
         partitioned: None,
+        partition_by: None,
         after_columns: vec![],
         has_table_keyword: false,
         on: None,
